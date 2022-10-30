@@ -79,7 +79,7 @@ selected = option_menu(menu_title=None,
     orientation='horizontal')
 
 # Folium
-m = folium.Map(location=[lat, lon], tiles='CartoDB dark_matter', zoom_start=15) #tiles='CartoDB dark_matter'
+m = folium.Map(location=[lat, lon], zoom_start=15) #tiles='CartoDB dark_matter'
 
 # Getting data from DETA and create dataframe
 df = pd.DataFrame(columns=['latitude', 'longitude', 'location', 'country', 'category', 'rating', 'period', 'comment', 'image'])
