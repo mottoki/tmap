@@ -55,8 +55,8 @@ st.sidebar.title("Enter address")
 locality = st.sidebar.text_input("Location", "Bugis")
 country = st.sidebar.text_input("Country", "Singapore")
 
-st.write("-------------")
-width_map = st.sidebar.number_input("Map Width", 250)
+# st.write("-------------")
+# width_map = st.sidebar.number_input("Map Width", 250)
 
 # -------------- MAP -------------------------------------
 geolocator = Nominatim(user_agent="GTA Lookup")
@@ -104,7 +104,7 @@ for item in dataitems:
 if selected == select_options[0]:
     col1, col2 = st.columns([1,1])
     with col1:
-        output = st_folium(m, width=250, height=450) # width=250,
+        output = st_folium(m, width=350, height=450) # width=250,
         last_obj = output['last_object_clicked']
         if last_obj:
             displat = last_obj['lat']
@@ -157,7 +157,7 @@ if selected == select_options[1]:
     col1, col2 = st.columns([1,1])
     with col1:
         Draw().add_to(m) # Draw(export=True)
-        output = st_folium(m, width=250, height=450) #width=725
+        output = st_folium(m, width=350, height=450) #width=725
     with col2:
         loglocality = st.text_input("Location", locality, key='loglocality')
         logcountry = st.text_input("Country", country, key='logcountry')
