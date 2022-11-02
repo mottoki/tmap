@@ -29,14 +29,14 @@ def load_image(image_file):
 # ------------ CONFIG -------------------
 st.set_page_config(page_title='TMap', page_icon=None, layout="wide")
 
-hide_table_row_index = """
-    <style>
-    footer {visibility: hidden;}
-    header {visibility: hidden;}
-    </style>
-    """
+# hide_table_row_index = """
+#     <style>
+#     footer {visibility: hidden;}
+#     header {visibility: hidden;}
+#     </style>
+#     """
 
-st.markdown(hide_table_row_index, unsafe_allow_html=True)
+# st.markdown(hide_table_row_index, unsafe_allow_html=True)
 
 # Create API client.
 credentials = service_account.Credentials.from_service_account_info(
@@ -48,16 +48,19 @@ bucket_name = st.secrets["bucket_name"]
 
 # -------------- DATA ----------------------------
 dataitems = db.fetch_all_data()
-
+all_countries = [item['country'] for item in dataitems]
 # -------------- SIDEBAR -------------------------
 st.sidebar.title("Enter address")
 
 # street = st.sidebar.text_input("Street", "75 Bay Street")
 # city = st.sidebar.text_input("City", "Toronto")
 # province = st.sidebar.text_input("Province", "Ontario")
-country = st.sidebar.text_input("Country", "Singapore")
-locality = st.sidebar.text_input("Location", "Bugis")
+# country = st.sidebar.text_input("Country", "Singapore", key='search_country')
+country = st.sidebar.selectbox("Search country", all_countries, key='search_country')
+locality = st.sidebar.text_input("Location", key='search_locality')
 
+country = st.session_state['search_country']
+locality = st.session_state['search_locality']
 
 # st.write("-------------")
 # width_map = st.sidebar.number_input("Map Width", 250)
@@ -66,7 +69,13 @@ locality = st.sidebar.text_input("Location", "Bugis")
 geolocator = Nominatim(user_agent="GTA Lookup")
 geocode = RateLimiter(geolocator.geocode, min_delay_seconds=1)
 # location = geolocator.geocode(street+", "+city+", "+province+", "+country)
-location = geolocator.geocode(locality+", "+country)
+if locality!='':
+    location = geolocator.geocode(locality+", "+country)
+    initial_zoom = 15
+else:
+    location = geolocator.geocode(country)
+    initial_zoom = 5
+
 
 lat = location.latitude
 lon = location.longitude
@@ -82,7 +91,7 @@ selected = option_menu(menu_title=None,
     orientation='horizontal')
 
 # Folium
-m = folium.Map(location=[lat, lon], zoom_start=15) #tiles='CartoDB dark_matter'
+m = folium.Map(location=[lat, lon], zoom_start=initial_zoom) #tiles='CartoDB dark_matter'
 
 # Getting data from DETA and create dataframe
 df = pd.DataFrame(columns=['latitude', 'longitude', 'location', 'country', 'category', 'rating', 'period', 'comment', 'image'])
@@ -100,6 +109,8 @@ for item in dataitems:
     dcom = item['comment']
     dima = item['image']
     df.loc[len(df)] = [dlat, dlon, dloc, dcon, dcat, drat, dper, dcom, dima]
+
+    # Folium Marker
     folium.Marker(location=[dlat, dlon], popup=dloc,
         icon=BeautifyIcon(icon=caticon[dcat], icon_shape="marker",
             border_color=catcol[dcat], background_color=catcol[dcat])).add_to(m)
@@ -126,7 +137,6 @@ if selected == select_options[0]:
                 st.subheader(disploc)
                 st.text(dispcom)
                 for key in dispima:
-                    print(dispima[key])
                     st.image(dispima[key], use_column_width='always')
 
 def upload_to_bucket(blob_name, blob_type, bytedata, bucket_name):
@@ -148,7 +158,7 @@ if selected == select_options[1]:
         Draw().add_to(m) # Draw(export=True)
         output = st_folium(m, width=350, height=450) #width=725
     with col2:
-        loglocality = st.text_input("Location", locality, key='loglocality')
+        loglocality = st.text_input("Location", key='loglocality')
         logcountry = st.text_input("Country", country, key='logcountry')
         if output['all_drawings']:
             drawingpoints = output['all_drawings']
