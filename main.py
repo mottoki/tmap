@@ -4,7 +4,7 @@ import geopandas as gpd
 import pandas as pd
 import geopy
 import folium
-from folium.plugins import Draw
+from folium.plugins import Draw, BeautifyIcon
 from streamlit_folium import st_folium
 from streamlit_option_menu import option_menu
 
@@ -46,14 +46,18 @@ client = storage.Client(credentials=credentials)
 
 bucket_name = st.secrets["bucket_name"]
 
-# -------------- SIDEBAR -----------------------------
+# -------------- DATA ----------------------------
+dataitems = db.fetch_all_data()
+
+# -------------- SIDEBAR -------------------------
 st.sidebar.title("Enter address")
 
 # street = st.sidebar.text_input("Street", "75 Bay Street")
 # city = st.sidebar.text_input("City", "Toronto")
 # province = st.sidebar.text_input("Province", "Ontario")
-locality = st.sidebar.text_input("Location", "Bugis")
 country = st.sidebar.text_input("Country", "Singapore")
+locality = st.sidebar.text_input("Location", "Bugis")
+
 
 # st.write("-------------")
 # width_map = st.sidebar.number_input("Map Width", 250)
@@ -64,7 +68,6 @@ geocode = RateLimiter(geolocator.geocode, min_delay_seconds=1)
 # location = geolocator.geocode(street+", "+city+", "+province+", "+country)
 location = geolocator.geocode(locality+", "+country)
 
-
 lat = location.latitude
 lon = location.longitude
 
@@ -72,7 +75,7 @@ lon = location.longitude
 # st.map(map_data)
 
 # ---------- NAV MENU ----------------
-select_options = ["View Map", "New Entry"]
+select_options = ["Map", "Entry"]
 selected = option_menu(menu_title=None,
     options=select_options,
     icons=["bar-chart-fill", "pencil-fill"], # https://icons.getbootstrap.com
@@ -84,9 +87,8 @@ m = folium.Map(location=[lat, lon], zoom_start=15) #tiles='CartoDB dark_matter'
 # Getting data from DETA and create dataframe
 df = pd.DataFrame(columns=['latitude', 'longitude', 'location', 'country', 'category', 'rating', 'period', 'comment', 'image'])
 all_cat = ["Food", "Entertainment", "Nature"]
-caticon = {all_cat[0]:'glass', all_cat[1]:'plane', all_cat[2]:'fire'}
-catcol = {all_cat[0]:'red', all_cat[1]:'blue', all_cat[2]:'green'}
-dataitems = db.fetch_all_data()
+caticon = {all_cat[0]:'glass', all_cat[1]:'heart', all_cat[2]:'leaf'}
+catcol = {all_cat[0]:'coral', all_cat[1]:'darkturquoise', all_cat[2]:'palegreen'}
 for item in dataitems:
     dlat = item['latitude']
     dlon = item['longitude']
@@ -99,7 +101,9 @@ for item in dataitems:
     dima = item['image']
     df.loc[len(df)] = [dlat, dlon, dloc, dcon, dcat, drat, dper, dcom, dima]
     folium.Marker(location=[dlat, dlon], popup=dloc,
-        icon=folium.Icon(icon=caticon[dcat], color=catcol[dcat])).add_to(m)
+        icon=BeautifyIcon(icon=caticon[dcat], icon_shape="marker",
+            border_color=catcol[dcat], background_color=catcol[dcat])).add_to(m)
+        # icon=folium.Icon(icon=caticon[dcat], color=catcol[dcat])).add_to(m)
 
 if selected == select_options[0]:
     col1, col2 = st.columns([1,1])
@@ -120,26 +124,10 @@ if selected == select_options[0]:
             with col2:
                 st.caption(dispper+" | "+dispcat+" | "+dispcon)
                 st.subheader(disploc)
-
                 st.text(dispcom)
-                # st.image(load_image(dispima),width=250)
-                st.image(dispima, use_column_width='always')
-    # st.write(output)
-    # @st.experimental_memo(ttl=600)
-    # def read_file(bucket_name, blob):
-    #     # bucket = client.bucket(bucket_name)
-    #     # content = bucket.blob(file_path).download_as_string().decode("utf-8")
-    #     link = f'https://storage.cloud.google.com/{bucket_name}/{blob}'
-    #     return link
-
-    # bucket_name = "streamlit-map-storage"
-    # file_path = "1995train.jpg"
-    # blobs = client.list_blobs(bucket_name)
-    # blob = [blob.name for blob in blobs][0]
-    # imglink = read_file(bucket_name, blob)
-    # st.image(imglink, width=800)
-    # content = read_file(bucket_name, file_path)
-    # st.image(load_image(content),width=250)
+                for key in dispima:
+                    print(dispima[key])
+                    st.image(dispima[key], use_column_width='always')
 
 def upload_to_bucket(blob_name, blob_type, bytedata, bucket_name):
     """ Upload data to a google cloud bucket and get public URL"""
@@ -150,7 +138,8 @@ def upload_to_bucket(blob_name, blob_type, bytedata, bucket_name):
     blob.upload_from_string(bytedata, content_type=blob_type)
     # returns a public url
     # blob.make_public()
-    return f'https://storage.cloud.google.com/{bucket_name}/{blob_name}'
+    # return f'https://storage.cloud.google.com/{bucket_name}/{blob_name}'
+    return f'https://storage.googleapis.com/{bucket_name}/{blob_name}'
 
 if selected == select_options[1]:
     # Add marker
@@ -171,13 +160,16 @@ if selected == select_options[1]:
         rating = st.selectbox("Star", (1, 2, 3, 4, 5), key='rating')
         mydate = st.date_input("Date", datetime.today(), key='mydate')
         comment = st.text_area('Comments', key='comment')
-    image_file = st.file_uploader("Upload Images", type=["png","jpg","jpeg"], key='image_file')
+    image_files = st.file_uploader("Upload Images", type=["png","jpg","jpeg"],
+        accept_multiple_files=True, key='image_files')
     # image_data = image_file.read()
-    if image_file is not None:
-        file_details = {"filename":image_file.name, "filetype":image_file.type, "filesize":image_file.size}
+    # if image_file is not None:
+        # file_details = {"filename":image_file.name, "filetype":image_file.type, "filesize":image_file.size}
         # st.write(file_details)
+    for image_file in image_files:
         st.image(load_image(image_file), width=250)
 
+    dictimages = {}
     if st.button("Submit"):
         loglocality = st.session_state['loglocality']
         logcountry = st.session_state['logcountry']
@@ -186,36 +178,16 @@ if selected == select_options[1]:
         mydate = str(st.session_state['mydate'])
         comment = st.session_state['comment']
         mykey = mydate+"_"+loglocality
-        image_file = st.session_state['image_file']
-        bytedata = image_file.read()
-        image_url = upload_to_bucket(image_file.name, image_file.type,  bytedata, bucket_name)
+        image_files = [image_file for image_file in st.session_state['image_files']]
+        for image_file in image_files:
+            bytedata = image_file.read()
+            image_url = upload_to_bucket(image_file.name, image_file.type,  bytedata, bucket_name)
+            dictimages[image_file.name]=image_url
 
         # print(image_url, image_file.name, image_file.type, bucket_name)
-        db.insert_location(mykey, loglocality, logcountry, loglat, loglon, category, rating, mydate, comment, image_url)
+        db.insert_location(mykey, loglocality, logcountry, loglat, loglon, category, rating, mydate, comment, dictimages)
         st.success('Success!', icon="✅")
 
-    # folium.Marker(location=[loglat, loglon], popup=loglocality,
-    #     icon=folium.Icon(icon='glass')).add_to(m)
-
-
-# app = Nominatim(user_agent="tutorial")
-
-# if output['all_drawings']:
-#     drawingpoints = output['all_drawings']
-
-#     for pnt in drawingpoints:
-#         coord = pnt['geometry']['coordinates']
-#         lon = coord[0]
-#         lat = coord[1]
-#         address = get_address_by_location(lat, lon, geolocator)
-#         display_name = address['display_name']
-
-        # folium.Marker(
-        #     [lat, lon],
-        #     popup=display_name,
-        #     tooltip=lon).add_to(m)
-
-# output = st_folium(m, width=725, height=500, key='test2')
 
 
 
