@@ -29,14 +29,14 @@ def load_image(image_file):
 # ------------ CONFIG -------------------
 st.set_page_config(page_title='TMap', page_icon=None, layout="wide")
 
-# hide_table_row_index = """
-#     <style>
-#     footer {visibility: hidden;}
-#     header {visibility: hidden;}
-#     </style>
-#     """
+hide_table_row_index = """
+    <style>
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    </style>
+    """
 
-# st.markdown(hide_table_row_index, unsafe_allow_html=True)
+st.markdown(hide_table_row_index, unsafe_allow_html=True)
 
 # Create API client.
 credentials = service_account.Credentials.from_service_account_info(
@@ -50,7 +50,7 @@ bucket_name = st.secrets["bucket_name"]
 dataitems = db.fetch_all_data()
 all_countries = [item['country'] for item in dataitems]
 # -------------- SIDEBAR -------------------------
-st.sidebar.title("Enter address")
+st.sidebar.title("Search")
 
 # street = st.sidebar.text_input("Street", "75 Bay Street")
 # city = st.sidebar.text_input("City", "Toronto")
@@ -94,11 +94,12 @@ selected = option_menu(menu_title=None,
 m = folium.Map(location=[lat, lon], zoom_start=initial_zoom) #tiles='CartoDB dark_matter'
 
 # Getting data from DETA and create dataframe
-df = pd.DataFrame(columns=['latitude', 'longitude', 'location', 'country', 'category', 'rating', 'period', 'comment', 'image'])
+df = pd.DataFrame(columns=['key', 'latitude', 'longitude', 'location', 'country', 'category', 'rating', 'period', 'comment', 'image'])
 all_cat = ["Food", "Entertainment", "Nature"]
 caticon = {all_cat[0]:'glass', all_cat[1]:'heart', all_cat[2]:'leaf'}
 catcol = {all_cat[0]:'coral', all_cat[1]:'darkturquoise', all_cat[2]:'palegreen'}
 for item in dataitems:
+    dkey = item['key']
     dlat = item['latitude']
     dlon = item['longitude']
     dloc = item['locality']
@@ -108,7 +109,7 @@ for item in dataitems:
     dper = item['period']
     dcom = item['comment']
     dima = item['image']
-    df.loc[len(df)] = [dlat, dlon, dloc, dcon, dcat, drat, dper, dcom, dima]
+    df.loc[len(df)] = [dkey, dlat, dlon, dloc, dcon, dcat, drat, dper, dcom, dima]
 
     # Folium Marker
     folium.Marker(location=[dlat, dlon], popup=dloc,
@@ -157,42 +158,88 @@ if selected == select_options[1]:
     with col1:
         Draw().add_to(m) # Draw(export=True)
         output = st_folium(m, width=350, height=450) #width=725
+        # try:
+        #     lobj_lat = output['last_object_clicked']['lat']
+        #     lobj_lon = output['last_object_clicked']['lng']
+        # except:
+        #     lobj_lat = None
+        #     lobj_lon = None
     with col2:
-        loglocality = st.text_input("Location", key='loglocality')
-        logcountry = st.text_input("Country", country, key='logcountry')
-        if output['all_drawings']:
-            drawingpoints = output['all_drawings']
-            for pnt in drawingpoints:
-                coord = pnt['geometry']['coordinates']
-                loglon = coord[0]
-                loglat = coord[1]
-        category = st.selectbox("Category", all_cat, key='category')
-        rating = st.selectbox("Star", (1, 2, 3, 4, 5), key='rating')
-        mydate = st.date_input("Date", datetime.today(), key='mydate')
-        comment = st.text_area('Comments', key='comment')
-    image_files = st.file_uploader("Upload Images", type=["png","jpg","jpeg"],
-        accept_multiple_files=True, key='image_files')
-    # image_data = image_file.read()
-    # if image_file is not None:
-        # file_details = {"filename":image_file.name, "filetype":image_file.type, "filesize":image_file.size}
-        # st.write(file_details)
-    for image_file in image_files:
-        st.image(load_image(image_file), width=250)
+        try:
+            last_obj_inp = output['last_object_clicked']
+        except:
+            last_obj_inp = ''
+        if last_obj_inp:
+            loglat = last_obj_inp['lat']
+            loglon = last_obj_inp['lng']
+            dff = df[(df['latitude']==loglat)&(df['longitude']==loglon)]
+            dispkey = dff.iloc[0]['key']
+            disploc = dff.iloc[0]['location']
+            dispcon = dff.iloc[0]['country']
+            dispcat = dff.iloc[0]['category']
+            disprat = dff.iloc[0]['rating']
+            dispper = dff.iloc[0]['period']
+            dispcom = dff.iloc[0]['comment']
+            dispima = dff.iloc[0]['image']
+            cat_index = all_cat.index(dispcat)
+            loglocality = st.text_input("Location", disploc, key='loglocality')
+            logcountry = st.text_input("Country", dispcon, key='logcountry')
+            category = st.selectbox("Category", all_cat, index=cat_index, key='category')
+            rating = st.selectbox("Star", (1, 2, 3, 4, 5), index=disprat-1, key='rating')
+            mydate = st.date_input("Date", datetime.strptime(dispper, '%Y-%m-%d'), key='mydate')
+            comment = st.text_area('Comments', dispcom, key='comment')
+        else:
+            loglocality = st.text_input("Location", key='loglocality')
+            logcountry = st.text_input("Country", country, key='logcountry')
+            if output['all_drawings']:
+                drawingpoints = output['all_drawings']
+                for pnt in drawingpoints:
+                    coord = pnt['geometry']['coordinates']
+                    loglon = coord[0]
+                    loglat = coord[1]
+            category = st.selectbox("Category", all_cat, key='category')
+            rating = st.selectbox("Star", (1, 2, 3, 4, 5), key='rating')
+            mydate = st.date_input("Date", datetime.today(), key='mydate')
+            comment = st.text_area('Comments', key='comment')
+
+    if last_obj_inp:
+        for key in dispima:
+            st.image(dispima[key], use_column_width='always')
+    else:
+        image_files = st.file_uploader("Upload Images", type=["png","jpg","jpeg"],
+            accept_multiple_files=True, key='image_files')
+        # image_data = image_file.read()
+        # if image_file is not None:
+            # file_details = {"filename":image_file.name, "filetype":image_file.type, "filesize":image_file.size}
+            # st.write(file_details)
+        for image_file in image_files:
+            st.image(load_image(image_file), width=250)
 
     dictimages = {}
     if st.button("Submit"):
-        loglocality = st.session_state['loglocality']
-        logcountry = st.session_state['logcountry']
-        category = st.session_state['category']
-        rating = st.session_state['rating']
-        mydate = str(st.session_state['mydate'])
-        comment = st.session_state['comment']
-        mykey = mydate+"_"+loglocality
-        image_files = [image_file for image_file in st.session_state['image_files']]
-        for image_file in image_files:
-            bytedata = image_file.read()
-            image_url = upload_to_bucket(image_file.name, image_file.type,  bytedata, bucket_name)
-            dictimages[image_file.name]=image_url
+
+        if last_obj_inp:
+            loglocality = st.session_state['loglocality']
+            logcountry = st.session_state['logcountry']
+            category = st.session_state['category']
+            rating = st.session_state['rating']
+            mydate = str(st.session_state['mydate'])
+            comment = st.session_state['comment']
+            mykey = dispkey
+            dictimages = dispima
+        else:
+            loglocality = st.session_state['loglocality']
+            logcountry = st.session_state['logcountry']
+            category = st.session_state['category']
+            rating = st.session_state['rating']
+            mydate = str(st.session_state['mydate'])
+            comment = st.session_state['comment']
+            mykey = mydate+"_"+loglocality
+            image_files = [image_file for image_file in st.session_state['image_files']]
+            for image_file in image_files:
+                bytedata = image_file.read()
+                image_url = upload_to_bucket(image_file.name, image_file.type,  bytedata, bucket_name)
+                dictimages[image_file.name]=image_url
 
         # print(image_url, image_file.name, image_file.type, bucket_name)
         db.insert_location(mykey, loglocality, logcountry, loglat, loglon, category, rating, mydate, comment, dictimages)
