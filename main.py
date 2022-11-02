@@ -22,6 +22,8 @@ import io
 from google.oauth2 import service_account
 from google.cloud import storage
 
+from country_list import countries_for_language
+
 def load_image(image_file):
     img = Image.open(image_file)
     return img
@@ -48,7 +50,10 @@ bucket_name = st.secrets["bucket_name"]
 
 # -------------- DATA ----------------------------
 dataitems = db.fetch_all_data()
-all_countries = [item['country'] for item in dataitems]
+# all_countries = [item['country'] for item in dataitems]
+countries = dict(countries_for_language('en'))
+all_countries = list(countries.values())
+country_default_index = all_countries.index('Singapore')
 # -------------- SIDEBAR -------------------------
 st.sidebar.title("Search")
 
@@ -56,7 +61,8 @@ st.sidebar.title("Search")
 # city = st.sidebar.text_input("City", "Toronto")
 # province = st.sidebar.text_input("Province", "Ontario")
 # country = st.sidebar.text_input("Country", "Singapore", key='search_country')
-country = st.sidebar.selectbox("Search country", all_countries, key='search_country')
+country = st.sidebar.selectbox("Search country", all_countries,
+    index=country_default_index, key='search_country')
 locality = st.sidebar.text_input("Location", key='search_locality')
 
 country = st.session_state['search_country']
