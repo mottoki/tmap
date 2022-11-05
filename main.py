@@ -54,6 +54,7 @@ dataitems = db.fetch_all_data()
 countries = dict(countries_for_language('en'))
 all_countries = list(countries.values())
 country_default_index = all_countries.index('Singapore')
+
 # -------------- SIDEBAR -------------------------
 st.sidebar.title("Search")
 
@@ -120,11 +121,19 @@ def retrieve_markers(dataitems, df, all_cat, caticon, catcol, draggable):
         df.loc[len(df)] = [dkey, dlat, dlon, dloc, dcon, dcat, drat, dper, dcom, dima]
 
         # Folium Marker
-        folium.Marker(location=[dlat, dlon], popup=dloc, draggable=draggable,
+        drat = ''.join(['⭐' for i in range(drat)])
+        html = f'''{dloc}<br>
+        {drat}'''
+
+        # iframe = folium.IFrame(html,width=150, height=80)
+        # popup = folium.Popup(iframe, max_width=150)
+
+        folium.Marker(location=[dlat, dlon], tooltip=html, popup=html,
+            draggable=draggable,
             icon=BeautifyIcon(icon=caticon[dcat], icon_shape="marker",
                 border_color=catcol[dcat], background_color=catcol[dcat])).add_to(m)
             # icon=folium.Icon(icon=caticon[dcat], color=catcol[dcat])).add_to(m)
-        return df
+    return df
 
 df = pd.DataFrame(columns=cols)
 draggable = False
@@ -146,12 +155,30 @@ if selected == select_options[0]:
             dispper = dff.iloc[0]['period']
             dispcom = dff.iloc[0]['comment']
             dispima = dff.iloc[0]['image']
+            disprat = ''.join(['⭐' for i in range(disprat)])
             with col2:
-                st.caption(dispper+" | "+dispcat+" | "+dispcon)
+                st.caption(dispper+" | "+dispcat+" | "+dispcon +" | "+disprat)
                 st.subheader(disploc)
                 st.text(dispcom)
                 for key in dispima:
                     st.image(dispima[key], use_column_width='always')
+        else:
+            dff = df.head(5)
+            for i in range(len(dff.index)):
+                disploc = dff.iloc[i]['location']
+                dispcon = dff.iloc[i]['country']
+                dispcat = dff.iloc[i]['category']
+                disprat = dff.iloc[i]['rating']
+                dispper = dff.iloc[i]['period']
+                dispcom = dff.iloc[i]['comment']
+                dispima = dff.iloc[i]['image']
+                disprat = ''.join(['⭐' for i in range(disprat)])
+                with col2:
+                    st.caption(dispper+" | "+dispcat+" | "+dispcon +" | "+disprat)
+                    st.subheader(disploc)
+                    st.text(dispcom)
+                    for key in dispima:
+                        st.image(dispima[key], use_column_width='always')
 
 def upload_to_bucket(blob_name, blob_type, bytedata, bucket_name):
     """ Upload data to a google cloud bucket and get public URL"""
@@ -209,11 +236,11 @@ if selected == select_options[1]:
                 imglink = f'https://storage.googleapis.com/{bucket_name}/{imgname}'
                 imglinkdict[imgname] = imglink
                 st.markdown(imgname)
-                st.image(imglink, use_column_width='always')
+                st.image(imglink, use_column_width='auto')
             image_files = st.file_uploader("Upload More Images", type=["png","jpg","jpeg"],
                 accept_multiple_files=True, key='image_files')
             for image_file in image_files:
-                st.image(load_image(image_file), width=250)
+                st.image(load_image(image_file), use_column_width='auto')
 
         else:
             loglocality = st.text_input("Location", key='loglocality')
@@ -232,7 +259,7 @@ if selected == select_options[1]:
             image_files = st.file_uploader("Upload Images", type=["png","jpg","jpeg"],
                 accept_multiple_files=True, key='image_files')
             for image_file in image_files:
-                st.image(load_image(image_file), width=250)
+                st.image(load_image(image_file), use_column_width='auto')
 
     # if last_obj_inp:
     #     for key in dispima:
