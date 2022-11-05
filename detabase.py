@@ -7,8 +7,8 @@ deta = Deta(DETA_KEY)
 
 db = deta.Base("location_db")
 
-def insert_location(key, locality, country, latitude, longitude, category, rating, period, comment, image):
-    return db.put({"key": key, "locality": locality, "country": country, "latitude": latitude, "longitude": longitude, "category": category, "rating": rating, "period": period, "comment": comment, "image": image})
+def insert_location(key, locality, suburb, country, latitude, longitude, category, rating, period, comment, image):
+    return db.put({"key": key, "locality": locality, "suburb": suburb, "country": country, "latitude": latitude, "longitude": longitude, "category": category, "rating": rating, "period": period, "comment": comment, "image": image})
 
 def fetch_all_data():
     res = db.fetch()
