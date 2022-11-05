@@ -1,4 +1,4 @@
-
+from PIL import Image
 
 def get_address_by_location(latitude, longitude, app, language="en"):
     """This function returns an address as raw from a location
@@ -17,3 +17,9 @@ def get_key_from_value(d, val):
     if keys:
         return keys[0]
     return None
+
+def load_image(image_file):
+    img = Image.open(image_file)
+    return img
+
+

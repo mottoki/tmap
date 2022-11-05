@@ -13,7 +13,8 @@ from geopy.extra.rate_limiter import RateLimiter
 import time
 from datetime import datetime
 
-from myfunc import get_address_by_location, get_key_from_value
+from myfunc import get_address_by_location, get_key_from_value, load_image
+
 import detabase as db
 
 from PIL import Image
@@ -24,12 +25,9 @@ from google.cloud import storage
 
 from country_list import countries_for_language
 
-def load_image(image_file):
-    img = Image.open(image_file)
-    return img
-
 # ------------ CONFIG -------------------
-st.set_page_config(page_title='TMap', page_icon=None, layout="wide")
+webapp_title = 'TMAP'
+st.set_page_config(page_title=webapp_title, page_icon=None, layout="wide")
 
 hide_table_row_index = """
     <style>
@@ -40,19 +38,19 @@ hide_table_row_index = """
 
 st.markdown(hide_table_row_index, unsafe_allow_html=True)
 
-# Create API client.
+# Create API client. google cloud storage
 credentials = service_account.Credentials.from_service_account_info(
-    st.secrets["gcp_service_account"]
-)
+    st.secrets["gcp_service_account"])
 client = storage.Client(credentials=credentials)
-
 bucket_name = st.secrets["bucket_name"]
 
 # -------------- DATA ----------------------------
+# Fetch all data from Google Cloud Storage
 dataitems = db.fetch_all_data()
-# all_countries = [item['country'] for item in dataitems]
+# Get all countries
 countries = dict(countries_for_language('en'))
 all_countries = list(countries.values())
+# Initial country selection
 if dataitems:
     dfi = pd.DataFrame(dataitems)
     dfi = dfi.sort_values('period', ascending=False).reset_index(drop=True)
@@ -61,57 +59,7 @@ else:
     lastcon = 'Singapore'
 country_default_index = all_countries.index(lastcon)
 
-# -------------- SIDEBAR -------------------------
-st.sidebar.title("Search")
-
-# street = st.sidebar.text_input("Street", "75 Bay Street")
-# city = st.sidebar.text_input("City", "Toronto")
-# province = st.sidebar.text_input("Province", "Ontario")
-# country = st.sidebar.text_input("Country", "Singapore", key='search_country')
-country = st.sidebar.selectbox("Search country", all_countries,
-    index=country_default_index, key='search_country')
-locality = st.sidebar.text_input("Location", key='search_locality')
-
-country = st.session_state['search_country']
-locality = st.session_state['search_locality']
-
-# st.write("-------------")
-# width_map = st.sidebar.number_input("Map Width", 250)
-
-# -------------- MAP -------------------------------------
-geolocator = Nominatim(user_agent="GTA Lookup")
-geocode = RateLimiter(geolocator.geocode, min_delay_seconds=1)
-# location = geolocator.geocode(street+", "+city+", "+province+", "+country)
-if locality!='':
-    location = geolocator.geocode(locality+", "+country)
-    initial_zoom = 15
-else:
-    location = geolocator.geocode(country)
-    initial_zoom = 5
-
-
-lat = location.latitude
-lon = location.longitude
-
-# map_data = pd.DataFrame({'lat': [lat], 'lon': [lon]})
-# st.map(map_data)
-
-# ---------- NAV MENU ----------------
-select_options = ["Map", "Entry"]
-selected = option_menu(menu_title=None,
-    options=select_options,
-    icons=["bar-chart-fill", "pencil-fill"], # https://icons.getbootstrap.com
-    orientation='horizontal')
-
-# Folium
-m = folium.Map(location=[lat, lon], zoom_start=initial_zoom) #tiles='CartoDB dark_matter'
-
-# Getting data from DETA and create dataframe
-cols = ['key', 'latitude', 'longitude', 'location', 'suburb', 'country', 'category', 'rating', 'period', 'comment', 'image']
-all_cat = ["Food", "Drink", "Shopping", "Activity", "Accomodation", "View Point"]
-caticon = {all_cat[0]:'leaf', all_cat[1]:'glass', all_cat[2]:'gift', all_cat[3]:'bicycle', all_cat[4]:'home', all_cat[5]:'camera'}
-catcol = {all_cat[0]:'coral', all_cat[1]:'darkturquoise', all_cat[2]:'palegreen', all_cat[3]:'#FEA3AA', all_cat[4]:'#9E7BFF', all_cat[5]:'#E9AB17'}
-
+# ------------ FUNCTIONS --------------------------
 def retrieve_markers(dataitems, df, all_cat, caticon, catcol, draggable):
     for item in dataitems:
         dkey = item['key']
@@ -142,14 +90,61 @@ def retrieve_markers(dataitems, df, all_cat, caticon, catcol, draggable):
             # icon=folium.Icon(icon=caticon[dcat], color=catcol[dcat])).add_to(m)
     return df
 
+# -------------- SIDEBAR -------------------------
+st.sidebar.title("Search")
+
+country = st.sidebar.selectbox("Search country", all_countries,
+    index=country_default_index, key='search_country')
+locality = st.sidebar.text_input("Location", key='search_locality')
+country = st.session_state['search_country']
+locality = st.session_state['search_locality']
+
+# st.write("-------------")
+# width_map = st.sidebar.number_input("Map Width", 250)
+
+# -------------- MAP -------------------------------------
+geolocator = Nominatim(user_agent="GTA Lookup")
+geocode = RateLimiter(geolocator.geocode, min_delay_seconds=1)
+if locality!='':
+    location = geolocator.geocode(locality+", "+country)
+    initial_zoom = 15
+else:
+    location = geolocator.geocode(country)
+    initial_zoom = 5
+# Find latitude and longitude
+lat = location.latitude
+lon = location.longitude
+
+# ---------- NAV MENU ----------------
+st.title(webapp_title)
+select_options = ["Map", "Entry"]
+selected = option_menu(menu_title=None,
+    options=select_options,
+    icons=["bar-chart-fill", "pencil-fill"], # https://icons.getbootstrap.com
+    orientation='horizontal')
+
+# Folium
+m = folium.Map(location=[lat, lon], zoom_start=initial_zoom) #tiles='CartoDB dark_matter'
+
+# Getting data from DETA and create dataframe
+cols = ['key', 'latitude', 'longitude', 'location', 'suburb', 'country', 'category', 'rating', 'period', 'comment', 'image']
+all_cat = ["Food", "Drink", "Shopping", "Activity", "Accomodation", "View Point"]
+caticon = {all_cat[0]:'leaf', all_cat[1]:'glass', all_cat[2]:'gift', all_cat[3]:'bicycle', all_cat[4]:'home', all_cat[5]:'camera'}
+catcol = {all_cat[0]:'coral', all_cat[1]:'darkturquoise', all_cat[2]:'palegreen', all_cat[3]:'#FEA3AA', all_cat[4]:'#9E7BFF', all_cat[5]:'#E9AB17'}
+
+# Get markers on the map
 df = pd.DataFrame(columns=cols)
 draggable = False
 df = retrieve_markers(dataitems, df, all_cat, caticon, catcol, draggable)
 
+# ------------ MAIN PART ---------------------------
+# Map visualisation - Tab 1
 if selected == select_options[0]:
     col1, col2 = st.columns([1,1])
+    # Map output
     with col1:
-        output = st_folium(m, width=350, height=450) # width=250,
+        output = st_folium(m, width=350, height=450)
+        # If marker clicked, retrieve the marker info
         last_obj = output['last_object_clicked']
         if last_obj:
             displat = last_obj['lat']
@@ -164,6 +159,7 @@ if selected == select_options[0]:
             dispcom = dff.iloc[0]['comment']
             dispima = dff.iloc[0]['image']
             disprat = ''.join(['⭐' for i in range(disprat)])
+            # Data output
             with col2:
                 st.subheader(disploc)
                 st.caption(dispper+" | "+dispcat+" | "+dispsub+" | "+dispcon)
@@ -171,6 +167,8 @@ if selected == select_options[0]:
                 st.text(dispcom)
                 for key in dispima:
                     st.image(dispima[key], use_column_width='always')
+
+        # If marker is unclicked, retrieve five latest data
         else:
             df = df.sort_values('period', ascending=False).reset_index(drop=True)
             dff = df.head(5)
@@ -184,6 +182,7 @@ if selected == select_options[0]:
                 dispcom = dff.iloc[i]['comment']
                 dispima = dff.iloc[i]['image']
                 disprat = ''.join(['⭐' for i in range(disprat)])
+                # Data output
                 with col2:
                     st.subheader(disploc)
                     st.caption(dispper+" | "+dispcat+" | "+dispsub+" | "+dispcon)
@@ -193,6 +192,7 @@ if selected == select_options[0]:
                         st.image(dispima[key], use_column_width='always')
                     st.markdown('---------')
 
+# Upload function
 def upload_to_bucket(blob_name, blob_type, bytedata, bucket_name):
     """ Upload data to a google cloud bucket and get public URL"""
     # Explicitly use service account credentials by specifying the private key
@@ -205,6 +205,7 @@ def upload_to_bucket(blob_name, blob_type, bytedata, bucket_name):
     # return f'https://storage.cloud.google.com/{bucket_name}/{blob_name}'
     return f'https://storage.googleapis.com/{bucket_name}/{blob_name}'
 
+# Add new entry
 if selected == select_options[1]:
     # Add marker
     col1, col2 = st.columns([1,1])
@@ -215,13 +216,13 @@ if selected == select_options[1]:
         df = retrieve_markers(dataitems, df, all_cat, caticon, catcol, draggable)
         Draw().add_to(m) # Draw(export=True)
         output = st_folium(m, width=350, height=450) #width=725
-        # print(output)
 
     with col2:
         try:
             last_obj_inp = output['last_object_clicked']
         except:
             last_obj_inp = ''
+        # If marker is clicked
         if last_obj_inp:
             loglat = last_obj_inp['lat']
             loglon = last_obj_inp['lng']
@@ -259,6 +260,7 @@ if selected == select_options[1]:
             for image_file in image_files:
                 st.image(load_image(image_file), use_column_width='auto')
 
+        # If the marker is not clicked
         else:
             loglocality = st.text_input("Location", key='loglocality')
             # country_index = all_countries.index(country)
@@ -283,9 +285,10 @@ if selected == select_options[1]:
             for image_file in image_files:
                 st.image(load_image(image_file), use_column_width='auto')
 
+        # Submit the new data
         dictimages = {}
-        if st.button("Submit"):
-
+        if st.button("Upload"):
+            # If marker is clicked
             if last_obj_inp:
                 loglocality = st.session_state['loglocality']
                 # logcountry = st.session_state['logcountry']
@@ -295,12 +298,13 @@ if selected == select_options[1]:
                 comment = st.session_state['comment']
                 mykey = dispkey
                 image_files = [image_file for image_file in st.session_state['image_files']]
+                # Upload images
                 for image_file in image_files:
                     bytedata = image_file.read()
                     image_url = upload_to_bucket(image_file.name, image_file.type,  bytedata, bucket_name)
                     imglinkdict[image_file.name]=image_url
-                # print(imglinkdict)
                 dictimages = imglinkdict
+            # If marker is not clicked
             else:
                 loglocality = st.session_state['loglocality']
                 # logcountry = st.session_state['logcountry']
@@ -310,12 +314,13 @@ if selected == select_options[1]:
                 comment = st.session_state['comment']
                 mykey = mydate+"_"+loglocality
                 image_files = [image_file for image_file in st.session_state['image_files']]
+                # Upload images
                 for image_file in image_files:
                     bytedata = image_file.read()
                     image_url = upload_to_bucket(image_file.name, image_file.type,  bytedata, bucket_name)
                     dictimages[image_file.name]=image_url
 
-            # print(image_url, image_file.name, image_file.type, bucket_name)
+            # Upload to the database
             db.insert_location(mykey, loglocality, logsuburb, logcountry, loglat, loglon, category, rating, mydate, comment, dictimages)
             st.success('Success!', icon="✅")
 
